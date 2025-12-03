@@ -3,6 +3,7 @@
 #include "ui_manager.h"
 #include "data_logger.h"
 #include "best_shares.h"
+#include "chart_data_buffer.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include "nvs_flash.h"
@@ -70,7 +71,10 @@ static void data_refresh_task(void *pvParameters)
 
         if (ret == ESP_OK && data.valid) {
             error_count = 0; // Reset error counter on success
-            
+
+            // Add data point to chart buffer
+            chart_buffer_add_point(&data);
+
             // Update all-time best diff if needed
             if (data.bestDiff > all_time_best_diff) {
                 all_time_best_diff = data.bestDiff;
@@ -81,7 +85,7 @@ static void data_refresh_task(void *pvParameters)
                 time_t now = time(NULL);
                 best_shares_add(data.bestDiff, now);
             }
-            
+
             // Check for block found event
             if (data.blockFound == 1 && last_block_found_state == 0) {
                 ESP_LOGI(TAG, "BLOCK FOUND DETECTED! Height: %" PRIu32 ", Diff: %llu",

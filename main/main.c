@@ -22,6 +22,7 @@
 #include "data_logger.h"
 #include "data_refresh_task.h"
 #include "best_shares.h"
+#include "chart_data_buffer.h"
 
 #define EXAMPLE_DISPLAY_ROTATION 90
 
@@ -143,6 +144,12 @@ void app_main(void)
         ESP_LOGW(TAG, "Best shares tracker initialization failed");
     }
 
+    // Initialize chart data buffer
+    ret = chart_buffer_init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Chart buffer initialization failed");
+    }
+
     // Start data refresh task
     ESP_LOGI(TAG, "Starting data refresh task...");
     ret = data_refresh_task_start();
@@ -183,8 +190,8 @@ static esp_err_t app_lvgl_init(void)
             .mirror_y = false,
         },
         .flags = {
-            .buff_spiram = false,
-            .buff_dma = true,
+            .buff_spiram = true,  // Use PSRAM for LVGL buffers (ESP32-S3 has 8MB)
+            .buff_dma = false,    // Cannot use DMA with PSRAM buffers
 #if LVGL_VERSION_MAJOR >= 9
             .swap_bytes = true,
 #endif

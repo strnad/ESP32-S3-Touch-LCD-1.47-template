@@ -3,6 +3,7 @@
 #include "bitaxe_api.h"
 #include "data_refresh_task.h"
 #include "best_shares.h"
+#include "chart_data_buffer.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include <stdio.h>
@@ -55,9 +56,7 @@ static lv_obj_t *fan_label = NULL;
 static lv_obj_t *asic_label = NULL;
 static lv_obj_t *version_label = NULL;
 
-// Control widgets (removed frequency/voltage controls)
-static lv_obj_t *primary_pool_btn = NULL;
-static lv_obj_t *fallback_pool_btn = NULL;
+// Control widgets
 static lv_obj_t *restart_btn = NULL;
 
 // Settings widgets
@@ -66,6 +65,13 @@ static lv_obj_t *ip_label = NULL;
 static lv_obj_t *board_label = NULL;
 static lv_obj_t *response_label = NULL;
 
+// Charts widgets
+static lv_obj_t *hashrate_chart = NULL;
+static lv_obj_t *temp_chart = NULL;
+static lv_chart_series_t *hashrate_series = NULL;
+static lv_chart_series_t *temp_series = NULL;
+static lv_chart_series_t *vrtemp_series = NULL;
+
 // Forward declarations
 static void create_page_indicator(void);
 static void create_dashboard_screen(void);
@@ -73,13 +79,12 @@ static void create_difficulty_screen(void);
 static void create_statistics_screen(void);
 static void create_control_screen(void);
 static void create_settings_screen(void);
+static void create_charts_screen(void);
 static void format_difficulty(char *buf, size_t len, uint64_t diff);
 static void format_uptime(char *buf, size_t len, uint32_t seconds);
 static void format_time_ago(char *buf, size_t len, time_t timestamp);
 
-// Button callbacks
-static void primary_pool_btn_callback(lv_event_t *e);
-static void fallback_pool_btn_callback(lv_event_t *e);
+// Button callback
 static void restart_btn_callback(lv_event_t *e);
 
 // Dark theme colors
@@ -108,6 +113,7 @@ esp_err_t ui_manager_init(void)
     create_statistics_screen();
     create_control_screen();
     create_settings_screen();
+    create_charts_screen();
 
     // Register gesture callbacks on all screens
     for (int i = 0; i < SCREEN_COUNT; i++) {
@@ -164,12 +170,13 @@ static void create_dashboard_screen(void)
     lv_obj_align(content, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(content, 0, 0);
-    lv_obj_set_style_pad_top(content, 5, 0);
+    lv_obj_set_style_pad_top(content, 2, 0);  // Reduced from 5 to 2
     lv_obj_set_style_pad_bottom(content, 25, 0);   // Padding for page indicator
     lv_obj_set_style_pad_left(content, 5, 0);
     lv_obj_set_style_pad_right(content, 5, 0);
     lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);  // Disable scrolling
 
     // WiFi status at top (full width)
     wifi_status_label = lv_label_create(content);
@@ -188,7 +195,7 @@ static void create_dashboard_screen(void)
 
     // Left column: Hashrate arc
     lv_obj_t *left_col = lv_obj_create(main_row);
-    lv_obj_set_size(left_col, 130, LV_SIZE_CONTENT);
+    lv_obj_set_size(left_col, 110, LV_SIZE_CONTENT);  // Reduced from 130
     lv_obj_set_style_bg_opa(left_col, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(left_col, 0, 0);
     lv_obj_set_style_pad_all(left_col, 0, 0);
@@ -196,7 +203,7 @@ static void create_dashboard_screen(void)
     lv_obj_set_flex_align(left_col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     hashrate_arc = lv_arc_create(left_col);
-    lv_obj_set_size(hashrate_arc, 120, 120);
+    lv_obj_set_size(hashrate_arc, 100, 100);  // Reduced from 120x120
     lv_arc_set_range(hashrate_arc, 0, 100);
     lv_arc_set_value(hashrate_arc, 0);
     lv_obj_remove_style(hashrate_arc, NULL, LV_PART_KNOB);
@@ -232,30 +239,30 @@ static void create_dashboard_screen(void)
 
     // Temperature cards (stacked vertically)
     lv_obj_t *temp_card = lv_obj_create(right_col);
-    lv_obj_set_size(temp_card, LV_PCT(95), 28);
+    lv_obj_set_size(temp_card, LV_PCT(95), 24);  // Reduced from 28
     lv_obj_set_style_bg_color(temp_card, CARD_COLOR, 0);
     lv_obj_set_style_border_width(temp_card, 0, 0);
-    lv_obj_set_style_pad_all(temp_card, 3, 0);
+    lv_obj_set_style_pad_all(temp_card, 2, 0);  // Reduced padding
     temp_label = lv_label_create(temp_card);
     lv_label_set_text(temp_label, LV_SYMBOL_IMAGE " --°C");
     lv_obj_center(temp_label);
     lv_obj_set_style_text_color(temp_label, TEXT_COLOR, 0);
 
     lv_obj_t *temp_vr_card = lv_obj_create(right_col);
-    lv_obj_set_size(temp_vr_card, LV_PCT(95), 28);
+    lv_obj_set_size(temp_vr_card, LV_PCT(95), 24);  // Reduced from 28
     lv_obj_set_style_bg_color(temp_vr_card, CARD_COLOR, 0);
     lv_obj_set_style_border_width(temp_vr_card, 0, 0);
-    lv_obj_set_style_pad_all(temp_vr_card, 3, 0);
+    lv_obj_set_style_pad_all(temp_vr_card, 2, 0);  // Reduced padding
     temp_vr_label = lv_label_create(temp_vr_card);
     lv_label_set_text(temp_vr_label, "VR --°C");
     lv_obj_center(temp_vr_label);
     lv_obj_set_style_text_color(temp_vr_label, TEXT_COLOR, 0);
 
     lv_obj_t *power_card = lv_obj_create(right_col);
-    lv_obj_set_size(power_card, LV_PCT(95), 28);
+    lv_obj_set_size(power_card, LV_PCT(95), 24);  // Reduced from 28
     lv_obj_set_style_bg_color(power_card, CARD_COLOR, 0);
     lv_obj_set_style_border_width(power_card, 0, 0);
-    lv_obj_set_style_pad_all(power_card, 3, 0);
+    lv_obj_set_style_pad_all(power_card, 2, 0);  // Reduced padding
     power_label = lv_label_create(power_card);
     lv_label_set_text(power_label, LV_SYMBOL_CHARGE " --W");
     lv_obj_center(power_label);
@@ -265,7 +272,7 @@ static void create_dashboard_screen(void)
     pool_label = lv_label_create(content);
     lv_label_set_text(pool_label, "Pool: Connecting...");
     lv_obj_set_style_text_color(pool_label, WARNING_COLOR, 0);
-    lv_obj_set_style_text_font(pool_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(pool_label, &lv_font_montserrat_10, 0);  // Reduced from 12
     lv_label_set_long_mode(pool_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_width(pool_label, LV_PCT(95));
 }
@@ -412,32 +419,42 @@ static void create_control_screen(void)
     lv_obj_set_style_pad_left(content, 5, 0);
     lv_obj_set_style_pad_right(content, 5, 0);
     lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    // Pool buttons
-    primary_pool_btn = lv_btn_create(content);
-    lv_obj_set_size(primary_pool_btn, LV_PCT(90), 45);
-    lv_obj_t *primary_label = lv_label_create(primary_pool_btn);
-    lv_label_set_text(primary_label, "Primary Pool");
-    lv_obj_set_style_text_font(primary_label, &lv_font_montserrat_16, 0);
-    lv_obj_center(primary_label);
-    lv_obj_add_event_cb(primary_pool_btn, primary_pool_btn_callback, LV_EVENT_CLICKED, NULL);
+    // Pool information labels (pool switching removed - BitAxe handles failover automatically)
+    lv_obj_t *pool_info_title = lv_label_create(content);
+    lv_label_set_text(pool_info_title, "Pool Configuration:");
+    lv_obj_set_style_text_color(pool_info_title, lv_color_hex(0xaaaaaa), 0);
+    lv_obj_set_style_pad_top(pool_info_title, 10, 0);
 
-    fallback_pool_btn = lv_btn_create(content);
-    lv_obj_set_size(fallback_pool_btn, LV_PCT(90), 45);
-    lv_obj_t *fallback_label = lv_label_create(fallback_pool_btn);
-    lv_label_set_text(fallback_label, "Fallback Pool");
-    lv_obj_set_style_text_font(fallback_label, &lv_font_montserrat_16, 0);
-    lv_obj_center(fallback_label);
-    lv_obj_add_event_cb(fallback_pool_btn, fallback_pool_btn_callback, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *primary_pool_label = lv_label_create(content);
+    lv_label_set_text(primary_pool_label, "Primary: ---");
+    lv_obj_set_style_text_color(primary_pool_label, TEXT_COLOR, 0);
+    lv_obj_set_style_text_font(primary_pool_label, &lv_font_montserrat_12, 0);
+    lv_label_set_long_mode(primary_pool_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(primary_pool_label, LV_PCT(90));
+
+    lv_obj_t *fallback_pool_label = lv_label_create(content);
+    lv_label_set_text(fallback_pool_label, "Fallback: ---");
+    lv_obj_set_style_text_color(fallback_pool_label, TEXT_COLOR, 0);
+    lv_obj_set_style_text_font(fallback_pool_label, &lv_font_montserrat_12, 0);
+    lv_label_set_long_mode(fallback_pool_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(fallback_pool_label, LV_PCT(90));
+
+    lv_obj_t *current_pool_label = lv_label_create(content);
+    lv_label_set_text(current_pool_label, "Current: Primary");
+    lv_obj_set_style_text_color(current_pool_label, ACCENT_COLOR, 0);
+    lv_obj_set_style_text_font(current_pool_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_pad_bottom(current_pool_label, 15, 0);
 
     // Restart button
     restart_btn = lv_btn_create(content);
     lv_obj_set_size(restart_btn, LV_PCT(90), 50);
-    lv_obj_set_style_bg_color(restart_btn, ERROR_COLOR, 0);
+    lv_obj_set_style_bg_color(restart_btn, CARD_COLOR, 0);  // Dark background for better readability
     lv_obj_t *restart_label = lv_label_create(restart_btn);
     lv_label_set_text(restart_label, LV_SYMBOL_POWER " Restart Miner");
     lv_obj_set_style_text_font(restart_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(restart_label, ERROR_COLOR, 0);  // Red text
     lv_obj_center(restart_label);
     lv_obj_add_event_cb(restart_btn, restart_btn_callback, LV_EVENT_CLICKED, NULL);
 }
@@ -474,6 +491,71 @@ static void create_settings_screen(void)
     response_label = lv_label_create(content);
     lv_label_set_text(response_label, "Response: --- ms");
     lv_obj_set_style_text_color(response_label, TEXT_COLOR, 0);
+}
+
+static void create_charts_screen(void)
+{
+    screens[SCREEN_CHARTS] = lv_obj_create(NULL);
+    lv_obj_set_style_bg_color(screens[SCREEN_CHARTS], BG_COLOR, 0);
+
+    lv_obj_t *content = lv_obj_create(screens[SCREEN_CHARTS]);
+    lv_obj_set_size(content, LV_PCT(100), LV_PCT(100));
+    lv_obj_align(content, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(content, 0, 0);
+    lv_obj_set_style_pad_top(content, 5, 0);
+    lv_obj_set_style_pad_bottom(content, 25, 0);
+    lv_obj_set_style_pad_left(content, 8, 0);
+    lv_obj_set_style_pad_right(content, 8, 0);
+    lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Title
+    lv_obj_t *title = lv_label_create(content);
+    lv_label_set_text(title, "Session Charts");
+    lv_obj_set_style_text_color(title, ACCENT_COLOR, 0);
+    lv_obj_set_style_pad_bottom(title, 5, 0);
+
+    // Hashrate chart
+    hashrate_chart = lv_chart_create(content);
+    lv_obj_set_size(hashrate_chart, 300, 125);
+    lv_chart_set_type(hashrate_chart, LV_CHART_TYPE_LINE);
+    lv_chart_set_range(hashrate_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 1000);  // Will be adjusted dynamically
+    lv_chart_set_point_count(hashrate_chart, 60);  // Show last 60 points (5 minutes)
+    lv_chart_set_update_mode(hashrate_chart, LV_CHART_UPDATE_MODE_SHIFT);
+    lv_obj_set_style_bg_color(hashrate_chart, CARD_COLOR, 0);
+    lv_obj_set_style_border_width(hashrate_chart, 0, 0);
+
+    // Hashrate series
+    hashrate_series = lv_chart_add_series(hashrate_chart, ACCENT_COLOR, LV_CHART_AXIS_PRIMARY_Y);
+
+    // Hashrate label
+    lv_obj_t *hashrate_chart_label = lv_label_create(content);
+    lv_label_set_text(hashrate_chart_label, "Hashrate (GH/s)");
+    lv_obj_set_style_text_color(hashrate_chart_label, lv_color_hex(0xaaaaaa), 0);
+    lv_obj_set_style_text_font(hashrate_chart_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_pad_top(hashrate_chart_label, 3, 0);
+
+    // Temperature chart
+    temp_chart = lv_chart_create(content);
+    lv_obj_set_size(temp_chart, 300, 125);
+    lv_chart_set_type(temp_chart, LV_CHART_TYPE_LINE);
+    lv_chart_set_range(temp_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 100);  // 0-100°C
+    lv_chart_set_point_count(temp_chart, 60);  // Show last 60 points (5 minutes)
+    lv_chart_set_update_mode(temp_chart, LV_CHART_UPDATE_MODE_SHIFT);
+    lv_obj_set_style_bg_color(temp_chart, CARD_COLOR, 0);
+    lv_obj_set_style_border_width(temp_chart, 0, 0);
+
+    // Temperature series (ASIC temp = green, VR temp = orange)
+    temp_series = lv_chart_add_series(temp_chart, ACCENT_COLOR, LV_CHART_AXIS_PRIMARY_Y);
+    vrtemp_series = lv_chart_add_series(temp_chart, WARNING_COLOR, LV_CHART_AXIS_PRIMARY_Y);
+
+    // Temperature label
+    lv_obj_t *temp_chart_label = lv_label_create(content);
+    lv_label_set_text(temp_chart_label, "Temp (green=ASIC, orange=VR)");
+    lv_obj_set_style_text_color(temp_chart_label, lv_color_hex(0xaaaaaa), 0);
+    lv_obj_set_style_text_font(temp_chart_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_pad_top(temp_chart_label, 3, 0);
 }
 
 void ui_manager_update_data(const bitaxe_data_t *data)
@@ -610,16 +692,32 @@ void ui_manager_update_data(const bitaxe_data_t *data)
     }
 
     // Update top 10 best shares
+    // Position #1: All-time best (from NVS, may not have timestamp)
+    // Positions #2-10: Session bests collected over time
+    if (best_shares_labels[0]) {
+        uint64_t all_time_best = data_refresh_task_get_all_time_best();
+        if (all_time_best > 0) {
+            char diff_str[32];
+            format_difficulty(diff_str, sizeof(diff_str), all_time_best);
+            snprintf(buf, sizeof(buf), "1. %s (ALL-TIME)", diff_str);
+            lv_label_set_text(best_shares_labels[0], buf);
+        } else {
+            lv_label_set_text(best_shares_labels[0], "1. --- (ALL-TIME)");
+        }
+    }
+
+    // Session bests in positions 2-10
     const best_share_t* top_shares = best_shares_get_top10();
     uint8_t share_count = best_shares_get_count();
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 1; i < 10; i++) {
         if (best_shares_labels[i]) {
-            if (i < share_count && top_shares[i].valid) {
+            int share_idx = i - 1;  // Offset by 1 since position 0 is all-time
+            if (share_idx < share_count && top_shares[share_idx].valid) {
                 char diff_str[32];
                 char time_str[32];
-                format_difficulty(diff_str, sizeof(diff_str), top_shares[i].difficulty);
-                format_time_ago(time_str, sizeof(time_str), top_shares[i].timestamp);
+                format_difficulty(diff_str, sizeof(diff_str), top_shares[share_idx].difficulty);
+                format_time_ago(time_str, sizeof(time_str), top_shares[share_idx].timestamp);
                 snprintf(buf, sizeof(buf), "%d. %s - %s", i + 1, diff_str, time_str);
                 lv_label_set_text(best_shares_labels[i], buf);
             } else {
@@ -679,6 +777,19 @@ void ui_manager_update_data(const bitaxe_data_t *data)
     if (response_label) {
         snprintf(buf, sizeof(buf), "Response: %.1f ms", data->responseTime);
         lv_label_set_text(response_label, buf);
+    }
+
+    // Update Charts screen
+    if (hashrate_series && temp_series && vrtemp_series) {
+        // Add new data points to charts
+        lv_chart_set_next_value(hashrate_chart, hashrate_series, (int32_t)data->hashRate);
+        lv_chart_set_next_value(temp_chart, temp_series, (int32_t)data->temp);
+        lv_chart_set_next_value(temp_chart, vrtemp_series, (int32_t)data->vrTemp);
+
+        // Dynamically adjust hashrate chart Y-axis range
+        int32_t max_hashrate = (int32_t)(data->expectedHashrate * 1.2f);
+        if (max_hashrate < 100) max_hashrate = 100;
+        lv_chart_set_range(hashrate_chart, LV_CHART_AXIS_PRIMARY_Y, 0, max_hashrate);
     }
 }
 
@@ -751,25 +862,7 @@ void ui_manager_hide_block_found(void)
 
 // Status bar removed - status info now integrated into dashboard screen
 
-// Button callback implementations
-static void primary_pool_btn_callback(lv_event_t *e)
-{
-    ESP_LOGI(TAG, "Primary pool button clicked");
-    esp_err_t err = bitaxe_api_switch_to_primary_pool();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to switch to primary pool");
-    }
-}
-
-static void fallback_pool_btn_callback(lv_event_t *e)
-{
-    ESP_LOGI(TAG, "Fallback pool button clicked");
-    esp_err_t err = bitaxe_api_switch_to_fallback_pool();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to switch to fallback pool");
-    }
-}
-
+// Button callback implementation
 static void restart_btn_callback(lv_event_t *e)
 {
     ESP_LOGI(TAG, "Restart button clicked");

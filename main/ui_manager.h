@@ -15,6 +15,7 @@ typedef enum {
     SCREEN_STATISTICS,
     SCREEN_CONTROL,
     SCREEN_SETTINGS,
+    SCREEN_CHARTS,
     SCREEN_COUNT
 } screen_index_t;
 
