@@ -1,32 +1,43 @@
-# _Sample project_
+# ESP32-S3-Touch-LCD-1.47 Template Project
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+This is a clean template project for the **Waveshare ESP32-S3-Touch-LCD-1.47** development board. It is configured with necessary drivers for the display, touch controller, and other peripherals, ready for your custom application.
 
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+## Features
 
+- **Display**: JD9853 driver (172x320 resolution)
+- **Touch**: CST816S/AXS5106 driver
+- **LVGL**: Pre-configured LVGL port
+- **Peripherals**: Drivers for Battery, WiFi, SD Card (optional), and RGB LED.
 
-
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
-
-## Example folder contents
-
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
-
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
-
-Below is short explanation of remaining files in the project folder.
+## Project Structure
 
 ```
-├── CMakeLists.txt
+├── components
+│   ├── esp_bsp             # Board Support Package (BSP)
+│   ├── esp_lcd_jd9853      # LCD Driver
+│   ├── esp_lcd_touch_axs5106 # Touch Driver
+│   └── ...
 ├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
+│   ├── main.c              # Main application entry point
+│   ├── lv_fs_port.c        # LVGL File System port (FatFS)
+│   └── CMakeLists.txt
+├── CMakeLists.txt
+└── README.md
 ```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
+
+## How to Use
+
+1.  **Clone/Copy** this project to a new directory.
+2.  **Build** using ESP-IDF:
+    ```bash
+    idf.py build
+    ```
+3.  **Flash** to the board:
+    ```bash
+    idf.py -p PORT flash monitor
+    ```
+
+## Configuration
+
+- **Display Rotation**: Modify `EXAMPLE_DISPLAY_ROTATION` in `main/main.c`.
+- **WiFi**: Uncomment and set credentials in `app_main` if needed.

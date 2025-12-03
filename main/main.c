@@ -15,14 +15,6 @@
 #include "bsp_sdcard.h"
 #include "bsp_battery.h"
 
-#include "iot_button.h"
-#include "button_gpio.h"
-
-#include "demos/lv_demos.h"
-
-
-#include "lvgl_ui.h"
-
 #define EXAMPLE_DISPLAY_ROTATION 0
 
 #if EXAMPLE_DISPLAY_ROTATION == 90 || EXAMPLE_DISPLAY_ROTATION == 270
@@ -37,7 +29,7 @@
 #define EXAMPLE_LCD_DRAW_BUFF_DOUBLE (1)
 
 
-static char *TAG = "lvgl_example";
+static char *TAG = "template_project";
 
 /* LCD IO and panel */
 static esp_lcd_panel_io_handle_t io_handle = NULL;
@@ -48,11 +40,7 @@ static esp_lcd_touch_handle_t touch_handle = NULL;
 static lv_display_t *lvgl_disp = NULL;
 static lv_indev_t *lvgl_touch_indev = NULL;
 
-
-void lv_fs_fatfs_init(void);
 static esp_err_t app_lvgl_init(void);
-static void button_init(void);
-static void touch_test(void);
 
 void app_main(void)
 {
@@ -68,26 +56,20 @@ void app_main(void)
 
     i2c_bus_handle = bsp_i2c_init();
     bsp_battery_init();
-    bsp_wifi_init("WSTEST", "waveshare0755");
+    // bsp_wifi_init("SSID", "PASSWORD"); // Uncomment and set credentials if needed
     bsp_display_init(&io_handle, &panel_handle, EXAMPLE_LCD_H_RES * EXAMPLE_LCD_DRAW_BUFF_HEIGHT);
     bsp_touch_init(&touch_handle, i2c_bus_handle, EXAMPLE_LCD_H_RES, EXAMPLE_LCD_V_RES, EXAMPLE_DISPLAY_ROTATION);
     // bsp_sdcard_init();
     ESP_ERROR_CHECK(app_lvgl_init());
-    // lv_fs_fatfs_init();
-
 
     bsp_display_brightness_init();
     bsp_display_set_brightness(100);
 
-    // button_init();
-    // touch_test();
-
-
     if (lvgl_port_lock(0))
     {
-        // lv_demo_benchmark();
-        // lv_demo_music();
-        lv_demo_widgets();
+        lv_obj_t *label = lv_label_create(lv_scr_act());
+        lv_label_set_text(label, "Template Project");
+        lv_obj_center(label);
         lvgl_port_unlock();
     }
 }
@@ -155,84 +137,4 @@ static esp_err_t app_lvgl_init(void)
     lvgl_touch_indev = lvgl_port_add_touch(&touch_cfg);
 
     return ESP_OK;
-}
-
-
-
-static bool touch_test_done = false;
-
-
-static void button_event_cb(void *arg, void *data)
-{
-    button_event_t event = iot_button_get_event((button_handle_t)arg);
-    ESP_LOGI(TAG, "%s", iot_button_get_event_str(event));
-    touch_test_done = true;
-}
-
-static void button_init(void)
-{
-    button_config_t btn_cfg = {};
-    button_gpio_config_t btn_gpio_cfg = {};
-    btn_gpio_cfg.gpio_num = GPIO_NUM_0;
-    btn_gpio_cfg.active_level = 0;
-    static button_handle_t btn = NULL;
-    ESP_ERROR_CHECK(iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &btn));
-    iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_LONG_PRESS_START, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_LONG_PRESS_HOLD, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_LONG_PRESS_UP, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_PRESS_END, NULL, button_event_cb, NULL);
-}
-
-static void touch_test(void)
-{
-    uint16_t touchpad_x[1] = {0};
-    uint16_t touchpad_y[1] = {0};
-    uint8_t touchpad_cnt = 0;
-    uint16_t color_arr[16] = {0};
-    lv_obj_t *lable = NULL;
-
-    for (int i = 0; i < 16; i++)
-    {
-        color_arr[i] = 0xf800;
-    }
-    if (lvgl_port_lock(0))
-    {
-        lable = lv_label_create(lv_scr_act());
-        lv_label_set_text(lable, "Touch testing mode \nExit with BOOT button");
-        lv_obj_center(lable);
-        lvgl_port_unlock();
-    }
-    vTaskDelay(pdMS_TO_TICKS(500));
-    if (lvgl_port_lock(0))
-    {
-        while (!touch_test_done)
-        {
-            /* Read data from touch controller into memory */
-            esp_lcd_touch_read_data(touch_handle);
-
-            /* Read data from touch controller */
-            bool touchpad_pressed = esp_lcd_touch_get_coordinates(touch_handle, touchpad_x, touchpad_y, NULL, &touchpad_cnt, 1);
-            if (touchpad_pressed && touchpad_cnt > 0)
-            {
-                // touchpad_x[0] = EXAMPLE_LCD_H_RES - 1 - touchpad_x[0];
-
-                if (touchpad_x[0] < 2)
-                    touchpad_x[0] = 2;
-                else if (touchpad_x[0] > EXAMPLE_LCD_H_RES - 2 - 1)
-                    touchpad_x[0] = EXAMPLE_LCD_H_RES - 2 - 1;
-
-                if (touchpad_y[0] < 2)
-                    touchpad_y[0] = 2;
-                else if (touchpad_y[0] > EXAMPLE_LCD_V_RES - 2 - 1)
-                    touchpad_y[0] = EXAMPLE_LCD_V_RES - 2 - 1;
-
-                esp_lcd_panel_draw_bitmap(panel_handle, touchpad_x[0] - 2, touchpad_y[0] - 2, touchpad_x[0] + 2, touchpad_y[0] + 2, color_arr);
-            }
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-        lv_obj_del(lable);
-        lvgl_port_unlock();
-    }
-    
 }
