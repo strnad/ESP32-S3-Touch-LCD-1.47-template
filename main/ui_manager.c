@@ -25,6 +25,7 @@ static lv_obj_t *block_label = NULL;
 // Page indicator
 static lv_obj_t *page_indicator = NULL;
 static lv_obj_t *page_dots[SCREEN_COUNT] = {NULL};
+static lv_timer_t *page_indicator_timer = NULL;
 
 // Dashboard widgets
 static lv_obj_t *hashrate_arc = NULL;
@@ -83,6 +84,7 @@ static void create_charts_screen(void);
 static void format_difficulty(char *buf, size_t len, uint64_t diff);
 static void format_uptime(char *buf, size_t len, uint32_t seconds);
 static void format_time_ago(char *buf, size_t len, time_t timestamp);
+static void page_indicator_timer_callback(lv_timer_t *timer);
 
 // Button callback
 static void restart_btn_callback(lv_event_t *e);
@@ -129,6 +131,20 @@ esp_err_t ui_manager_init(void)
 
     ESP_LOGI(TAG, "UI Manager initialized with %d screens", SCREEN_COUNT);
     return ESP_OK;
+}
+
+static void page_indicator_timer_callback(lv_timer_t *timer)
+{
+    // Hide the page indicator
+    if (page_indicator) {
+        lv_obj_add_flag(page_indicator, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Delete the timer
+    if (page_indicator_timer) {
+        lv_timer_del(page_indicator_timer);
+        page_indicator_timer = NULL;
+    }
 }
 
 static void create_page_indicator(void)
@@ -227,15 +243,27 @@ static void create_dashboard_screen(void)
     lv_obj_set_flex_flow(right_col, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(right_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-    // Efficiency labels
-    efficiency_label = lv_label_create(right_col);
+    // Efficiency card (percentage)
+    lv_obj_t *efficiency_card = lv_obj_create(right_col);
+    lv_obj_set_size(efficiency_card, LV_PCT(95), 24);
+    lv_obj_set_style_bg_color(efficiency_card, CARD_COLOR, 0);
+    lv_obj_set_style_border_width(efficiency_card, 0, 0);
+    lv_obj_set_style_pad_all(efficiency_card, 2, 0);
+    efficiency_label = lv_label_create(efficiency_card);
     lv_label_set_text(efficiency_label, "Eff: ---%");
-    lv_obj_set_style_text_color(efficiency_label, ACCENT_COLOR, 0);
+    lv_obj_center(efficiency_label);
+    lv_obj_set_style_text_color(efficiency_label, TEXT_COLOR, 0);
 
-    efficiency_jth_label = lv_label_create(right_col);
+    // Efficiency card (J/TH)
+    lv_obj_t *efficiency_jth_card = lv_obj_create(right_col);
+    lv_obj_set_size(efficiency_jth_card, LV_PCT(95), 24);
+    lv_obj_set_style_bg_color(efficiency_jth_card, CARD_COLOR, 0);
+    lv_obj_set_style_border_width(efficiency_jth_card, 0, 0);
+    lv_obj_set_style_pad_all(efficiency_jth_card, 2, 0);
+    efficiency_jth_label = lv_label_create(efficiency_jth_card);
     lv_label_set_text(efficiency_jth_label, "--- J/TH");
-    lv_obj_set_style_text_color(efficiency_jth_label, lv_color_hex(0xaaaaaa), 0);
-    lv_obj_set_style_text_font(efficiency_jth_label, &lv_font_montserrat_12, 0);
+    lv_obj_center(efficiency_jth_label);
+    lv_obj_set_style_text_color(efficiency_jth_label, TEXT_COLOR, 0);
 
     // Temperature cards (stacked vertically)
     lv_obj_t *temp_card = lv_obj_create(right_col);
@@ -801,6 +829,11 @@ void ui_manager_goto_screen(screen_index_t screen, bool animate, bool direction_
 
     current_screen = screen;
 
+    // Show page indicator
+    if (page_indicator) {
+        lv_obj_clear_flag(page_indicator, LV_OBJ_FLAG_HIDDEN);
+    }
+
     // Update page indicator
     for (int i = 0; i < SCREEN_COUNT; i++) {
         if (page_dots[i]) {
@@ -808,6 +841,16 @@ void ui_manager_goto_screen(screen_index_t screen, bool animate, bool direction_
                                       i == screen ? TEXT_COLOR : lv_color_hex(0x666666), 0);
         }
     }
+
+    // Delete existing timer if any
+    if (page_indicator_timer) {
+        lv_timer_del(page_indicator_timer);
+        page_indicator_timer = NULL;
+    }
+
+    // Create timer to hide page indicator after 1 second
+    page_indicator_timer = lv_timer_create(page_indicator_timer_callback, 1000, NULL);
+    lv_timer_set_repeat_count(page_indicator_timer, 1);
 
     if (animate) {
         lv_scr_load_anim_t anim_type = direction_left ? LV_SCR_LOAD_ANIM_MOVE_LEFT : LV_SCR_LOAD_ANIM_MOVE_RIGHT;
