@@ -35,8 +35,9 @@ void ui_manager_update_data(const bitaxe_data_t *data);
  * @brief Navigate to specific screen
  * @param screen Screen index
  * @param animate Whether to animate the transition
+ * @param direction_left true for left animation, false for right animation
  */
-void ui_manager_goto_screen(screen_index_t screen, bool animate);
+void ui_manager_goto_screen(screen_index_t screen, bool animate, bool direction_left);
 
 /**
  * @brief Get current screen index
@@ -56,13 +57,7 @@ void ui_manager_show_block_found(uint32_t block_height, uint64_t best_diff);
  */
 void ui_manager_hide_block_found(void);
 
-/**
- * @brief Update status bar indicators
- * @param wifi_connected WiFi connection status
- * @param using_fallback Using fallback pool
- * @param overheat Overheat mode active
- */
-void ui_manager_update_status_bar(bool wifi_connected, bool using_fallback, bool overheat);
+// Status bar removed - status info now integrated into dashboard screen
 
 #ifdef __cplusplus
 }

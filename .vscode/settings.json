@@ -13,5 +13,9 @@
     "--background-index",
     "--query-driver=C:\\Users\\jakub.strnad\\.espressif\\tools\\xtensa-esp-elf\\esp-14.2.0_20241119\\xtensa-esp-elf\\bin\\xtensa-esp32s3-elf-gcc.exe",
     "--compile-commands-dir=c:\\gitrepos\\ESP32-S3-Touch-LCD-1.47-template\\build"
-  ]
+  ],
+  "idf.espIdfPath": "/home/jakub/esp/v5.4/esp-idf",
+  "idf.toolsPath": "/home/jakub/.espressif",
+  "idf.pythonInstallPath": "/usr/bin/python",
+  "idf.port": "/dev/ttyACM0"
 }

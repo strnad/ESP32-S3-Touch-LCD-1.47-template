@@ -15,6 +15,12 @@ extern "C" {
  */
 esp_err_t gesture_handler_init(lv_indev_t *touch_indev);
 
+/**
+ * @brief Register gesture callback on a screen
+ * @param screen Screen object to register callback on
+ */
+void gesture_handler_register_screen(lv_obj_t *screen);
+
 #ifdef __cplusplus
 }
 #endif

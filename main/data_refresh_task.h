@@ -18,6 +18,12 @@ esp_err_t data_refresh_task_start(void);
  */
 void data_refresh_task_stop(void);
 
+/**
+ * @brief Get all-time best difficulty
+ * @return All-time best difficulty value
+ */
+uint64_t data_refresh_task_get_all_time_best(void);
+
 #ifdef __cplusplus
 }
 #endif

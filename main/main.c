@@ -21,8 +21,9 @@
 #include "gesture_handler.h"
 #include "data_logger.h"
 #include "data_refresh_task.h"
+#include "best_shares.h"
 
-#define EXAMPLE_DISPLAY_ROTATION 0
+#define EXAMPLE_DISPLAY_ROTATION 90
 
 #if EXAMPLE_DISPLAY_ROTATION == 90 || EXAMPLE_DISPLAY_ROTATION == 270
 #define EXAMPLE_LCD_H_RES (320)
@@ -135,7 +136,13 @@ void app_main(void)
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Data logger initialization failed (SD card may not be available)");
     }
-    
+
+    // Initialize best shares tracker
+    ret = best_shares_init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Best shares tracker initialization failed");
+    }
+
     // Start data refresh task
     ESP_LOGI(TAG, "Starting data refresh task...");
     ret = data_refresh_task_start();

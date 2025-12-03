@@ -2,6 +2,7 @@
 #include "bitaxe_api.h"
 #include "ui_manager.h"
 #include "data_logger.h"
+#include "best_shares.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include "nvs_flash.h"
@@ -9,6 +10,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
+#include <inttypes.h>
+#include <time.h>
 
 static const char *TAG = "data_refresh";
 static const char *NVS_NAMESPACE = "bitaxe_data";
@@ -56,16 +59,15 @@ static void data_refresh_task(void *pvParameters)
 {
     bitaxe_data_t data;
     uint32_t error_count = 0;
-    const uint32_t MAX_ERRORS = 3;
-    
+
     load_all_time_best();
-    
+
     ESP_LOGI(TAG, "Data refresh task started");
-    
+
     while (task_running) {
         // Fetch data from Bitaxe
         esp_err_t ret = bitaxe_api_get_system_info(&data);
-        
+
         if (ret == ESP_OK && data.valid) {
             error_count = 0; // Reset error counter on success
             
@@ -74,11 +76,15 @@ static void data_refresh_task(void *pvParameters)
                 all_time_best_diff = data.bestDiff;
                 save_all_time_best(all_time_best_diff);
                 ESP_LOGI(TAG, "New all-time best difficulty: %llu", (unsigned long long)all_time_best_diff);
+
+                // Add to best shares list with timestamp
+                time_t now = time(NULL);
+                best_shares_add(data.bestDiff, now);
             }
             
             // Check for block found event
             if (data.blockFound == 1 && last_block_found_state == 0) {
-                ESP_LOGI(TAG, "BLOCK FOUND DETECTED! Height: %u, Diff: %llu", 
+                ESP_LOGI(TAG, "BLOCK FOUND DETECTED! Height: %" PRIu32 ", Diff: %llu",
                          data.blockHeight, (unsigned long long)data.bestDiff);
                 
                 // Show block found alert (thread-safe)
@@ -98,12 +104,6 @@ static void data_refresh_task(void *pvParameters)
             // Update UI (thread-safe)
             if (lvgl_port_lock(pdMS_TO_TICKS(100))) {
                 ui_manager_update_data(&data);
-                
-                // Update status bar
-                bool wifi_connected = strcmp(data.wifiStatus, "Connected!") == 0;
-                ui_manager_update_status_bar(wifi_connected, data.isUsingFallbackStratum, 
-                                             data.overheat_mode != 0);
-                
                 lvgl_port_unlock();
             }
             
@@ -116,19 +116,14 @@ static void data_refresh_task(void *pvParameters)
             
         } else {
             error_count++;
-            ESP_LOGW(TAG, "Failed to fetch data from Bitaxe (error %d/%d)", error_count, MAX_ERRORS);
-            
-            if (error_count >= MAX_ERRORS) {
-                ESP_LOGE(TAG, "Multiple consecutive errors, API may be unreachable");
-                // Update status bar to show error
-                if (lvgl_port_lock(pdMS_TO_TICKS(100))) {
-                    ui_manager_update_status_bar(false, false, false);
-                    lvgl_port_unlock();
-                }
-            }
+            ESP_LOGW(TAG, "Failed to fetch data from Bitaxe (error %" PRIu32 ")", error_count);
+
+            // Wait only 3 seconds on error to retry faster
+            vTaskDelay(pdMS_TO_TICKS(3000));
+            continue;
         }
-        
-        // Wait 5 seconds before next fetch
+
+        // Wait 5 seconds before next fetch (only on success)
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
     
@@ -171,4 +166,9 @@ void data_refresh_task_stop(void)
         task_running = false;
         ESP_LOGI(TAG, "Stopping data refresh task...");
     }
+}
+
+uint64_t data_refresh_task_get_all_time_best(void)
+{
+    return all_time_best_diff;
 }
