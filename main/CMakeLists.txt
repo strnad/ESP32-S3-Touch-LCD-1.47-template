@@ -1,2 +1,10 @@
-idf_component_register(SRCS "main.c" "lv_fs_port.c"
-                    INCLUDE_DIRS ".")
+idf_component_register(SRCS "main.c" 
+                            "lv_fs_port.c" 
+                            "config_manager.c" 
+                            "bitaxe_api.c" 
+                            "ui_manager.c" 
+                            "gesture_handler.c" 
+                            "data_logger.c" 
+                            "data_refresh_task.c"
+                                   INCLUDE_DIRS "."
+                                   REQUIRES esp_lcd esp_lvgl_port esp_http_client json esp_wifi esp_event nvs_flash fatfs sdmmc vfs esp_bsp)

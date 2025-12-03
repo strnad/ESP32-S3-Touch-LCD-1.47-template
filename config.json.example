@@ -1,0 +1,5 @@
+{
+  "wifi_ssid": "YourWiFiSSID",
+  "wifi_password": "YourWiFiPassword",
+  "bitaxe_ip": "192.168.1.100"
+}
