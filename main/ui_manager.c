@@ -46,7 +46,6 @@ static lv_obj_t *alltime_diff_label = NULL;
 static lv_obj_t *shares_bar = NULL;
 static lv_obj_t *shares_label = NULL;
 static lv_obj_t *error_label = NULL;
-static lv_obj_t *best_shares_list = NULL;
 static lv_obj_t *best_shares_labels[10] = {NULL};
 
 // Statistics widgets
@@ -59,6 +58,9 @@ static lv_obj_t *version_label = NULL;
 
 // Control widgets
 static lv_obj_t *restart_btn = NULL;
+static lv_obj_t *primary_pool_label = NULL;
+static lv_obj_t *fallback_pool_label = NULL;
+static lv_obj_t *current_pool_label = NULL;
 
 // Settings widgets
 static lv_obj_t *wifi_info_label = NULL;
@@ -194,12 +196,6 @@ static void create_dashboard_screen(void)
     lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);  // Disable scrolling
 
-    // WiFi status at top (full width)
-    wifi_status_label = lv_label_create(content);
-    lv_label_set_text(wifi_status_label, LV_SYMBOL_WIFI " ---");
-    lv_obj_set_style_text_color(wifi_status_label, ACCENT_COLOR, 0);
-    lv_obj_set_style_text_font(wifi_status_label, &lv_font_montserrat_12, 0);
-
     // Main horizontal container (circle left, info right)
     lv_obj_t *main_row = lv_obj_create(content);
     lv_obj_set_size(main_row, LV_PCT(100), LV_SIZE_CONTENT);
@@ -232,6 +228,13 @@ static void create_dashboard_screen(void)
     lv_obj_center(hashrate_label);
     lv_obj_set_style_text_align(hashrate_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(hashrate_label, TEXT_COLOR, 0);
+
+    // WiFi status below the circle
+    wifi_status_label = lv_label_create(left_col);
+    lv_label_set_text(wifi_status_label, LV_SYMBOL_WIFI " ---");
+    lv_obj_set_style_text_color(wifi_status_label, ACCENT_COLOR, 0);
+    lv_obj_set_style_text_font(wifi_status_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_align(wifi_status_label, LV_TEXT_ALIGN_CENTER, 0);
 
     // Right column: All info
     lv_obj_t *right_col = lv_obj_create(main_row);
@@ -359,12 +362,12 @@ static void create_difficulty_screen(void)
     lv_label_set_text(alltime_diff_label, "---");
     lv_obj_set_style_text_color(alltime_diff_label, ACCENT_COLOR, 0);
     
-    // Shares bar
+    // Shares bar (green for accepted shares)
     shares_bar = lv_bar_create(content);
     lv_obj_set_size(shares_bar, LV_PCT(95), 20);
     lv_bar_set_range(shares_bar, 0, 100);
     lv_bar_set_value(shares_bar, 0, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(shares_bar, ERROR_COLOR, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(shares_bar, ACCENT_COLOR, LV_PART_INDICATOR);
     
     shares_label = lv_label_create(content);
     lv_label_set_text(shares_label, "Shares: 0 / 0");
@@ -455,21 +458,21 @@ static void create_control_screen(void)
     lv_obj_set_style_text_color(pool_info_title, lv_color_hex(0xaaaaaa), 0);
     lv_obj_set_style_pad_top(pool_info_title, 10, 0);
 
-    lv_obj_t *primary_pool_label = lv_label_create(content);
+    primary_pool_label = lv_label_create(content);
     lv_label_set_text(primary_pool_label, "Primary: ---");
     lv_obj_set_style_text_color(primary_pool_label, TEXT_COLOR, 0);
     lv_obj_set_style_text_font(primary_pool_label, &lv_font_montserrat_12, 0);
     lv_label_set_long_mode(primary_pool_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_width(primary_pool_label, LV_PCT(90));
 
-    lv_obj_t *fallback_pool_label = lv_label_create(content);
+    fallback_pool_label = lv_label_create(content);
     lv_label_set_text(fallback_pool_label, "Fallback: ---");
     lv_obj_set_style_text_color(fallback_pool_label, TEXT_COLOR, 0);
     lv_obj_set_style_text_font(fallback_pool_label, &lv_font_montserrat_12, 0);
     lv_label_set_long_mode(fallback_pool_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_width(fallback_pool_label, LV_PCT(90));
 
-    lv_obj_t *current_pool_label = lv_label_create(content);
+    current_pool_label = lv_label_create(content);
     lv_label_set_text(current_pool_label, "Current: Primary");
     lv_obj_set_style_text_color(current_pool_label, ACCENT_COLOR, 0);
     lv_obj_set_style_text_font(current_pool_label, &lv_font_montserrat_14, 0);
@@ -554,6 +557,10 @@ static void create_charts_screen(void)
     lv_obj_set_style_bg_color(hashrate_chart, CARD_COLOR, 0);
     lv_obj_set_style_border_width(hashrate_chart, 0, 0);
 
+    // Enable axes with ticks
+    lv_chart_set_axis_tick(hashrate_chart, LV_CHART_AXIS_PRIMARY_Y, 5, 3, 5, 2, true, 40);
+    lv_chart_set_axis_tick(hashrate_chart, LV_CHART_AXIS_PRIMARY_X, 10, 5, 7, 2, true, 30);
+
     // Hashrate series
     hashrate_series = lv_chart_add_series(hashrate_chart, ACCENT_COLOR, LV_CHART_AXIS_PRIMARY_Y);
 
@@ -573,6 +580,10 @@ static void create_charts_screen(void)
     lv_chart_set_update_mode(temp_chart, LV_CHART_UPDATE_MODE_SHIFT);
     lv_obj_set_style_bg_color(temp_chart, CARD_COLOR, 0);
     lv_obj_set_style_border_width(temp_chart, 0, 0);
+
+    // Enable axes with ticks
+    lv_chart_set_axis_tick(temp_chart, LV_CHART_AXIS_PRIMARY_Y, 5, 3, 5, 2, true, 40);
+    lv_chart_set_axis_tick(temp_chart, LV_CHART_AXIS_PRIMARY_X, 10, 5, 7, 2, true, 30);
 
     // Temperature series (ASIC temp = green, VR temp = orange)
     temp_series = lv_chart_add_series(temp_chart, ACCENT_COLOR, LV_CHART_AXIS_PRIMARY_Y);
@@ -658,16 +669,16 @@ void ui_manager_update_data(const bitaxe_data_t *data)
         lv_label_set_text(power_label, buf);
     }
 
-    // Update WiFi status at top of dashboard
+    // Update WiFi status below circle
     if (wifi_status_label) {
         bool wifi_ok = (data->wifiRSSI > -80);
         lv_obj_set_style_text_color(wifi_status_label, wifi_ok ? ACCENT_COLOR : WARNING_COLOR, 0);
 
         if (data->isUsingFallbackStratum) {
-            snprintf(buf, sizeof(buf), LV_SYMBOL_WIFI " %s " LV_SYMBOL_WARNING " Fallback", data->ssid);
+            snprintf(buf, sizeof(buf), LV_SYMBOL_WIFI " %s " LV_SYMBOL_WARNING, data->ssid);
             lv_obj_set_style_text_color(wifi_status_label, WARNING_COLOR, 0);
         } else {
-            snprintf(buf, sizeof(buf), LV_SYMBOL_WIFI " %s (RSSI: %ld)", data->ssid, (long)data->wifiRSSI);
+            snprintf(buf, sizeof(buf), LV_SYMBOL_WIFI " %s %ld", data->ssid, (long)data->wifiRSSI);
         }
         lv_label_set_text(wifi_status_label, buf);
     }
@@ -719,37 +730,41 @@ void ui_manager_update_data(const bitaxe_data_t *data)
         lv_label_set_text(error_label, buf);
     }
 
-    // Update top 10 best shares
-    // Position #1: All-time best (from NVS, may not have timestamp)
-    // Positions #2-10: Session bests collected over time
-    if (best_shares_labels[0]) {
-        uint64_t all_time_best = data_refresh_task_get_all_time_best();
-        if (all_time_best > 0) {
-            char diff_str[32];
-            format_difficulty(diff_str, sizeof(diff_str), all_time_best);
-            snprintf(buf, sizeof(buf), "1. %s (ALL-TIME)", diff_str);
-            lv_label_set_text(best_shares_labels[0], buf);
-        } else {
-            lv_label_set_text(best_shares_labels[0], "1. --- (ALL-TIME)");
-        }
-    }
-
-    // Session bests in positions 2-10
+    // Update top 10 best shares leaderboard
+    // All shares are now stored in the best_shares array, sorted by difficulty
+    // Position #1 will be all-time best (may not have timestamp if loaded from old NVS)
+    // Positions #2-10 will be next best session shares found over time
     const best_share_t* top_shares = best_shares_get_top10();
     uint8_t share_count = best_shares_get_count();
 
-    for (int i = 1; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
         if (best_shares_labels[i]) {
-            int share_idx = i - 1;  // Offset by 1 since position 0 is all-time
-            if (share_idx < share_count && top_shares[share_idx].valid) {
+            if (i < share_count && top_shares[i].valid) {
                 char diff_str[32];
-                char time_str[32];
-                format_difficulty(diff_str, sizeof(diff_str), top_shares[share_idx].difficulty);
-                format_time_ago(time_str, sizeof(time_str), top_shares[share_idx].timestamp);
-                snprintf(buf, sizeof(buf), "%d. %s - %s", i + 1, diff_str, time_str);
+                format_difficulty(diff_str, sizeof(diff_str), top_shares[i].difficulty);
+
+                // Format display based on whether we have timestamp and if it's all-time best
+                if (top_shares[i].is_all_time_best) {
+                    if (top_shares[i].timestamp > 0) {
+                        char time_str[32];
+                        format_time_ago(time_str, sizeof(time_str), top_shares[i].timestamp);
+                        snprintf(buf, sizeof(buf), "%d. %s - %s (ATH)", i + 1, diff_str, time_str);
+                    } else {
+                        snprintf(buf, sizeof(buf), "%d. %s (ATH)", i + 1, diff_str);
+                    }
+                } else {
+                    if (top_shares[i].timestamp > 0) {
+                        char time_str[32];
+                        format_time_ago(time_str, sizeof(time_str), top_shares[i].timestamp);
+                        snprintf(buf, sizeof(buf), "%d. %s - %s", i + 1, diff_str, time_str);
+                    } else {
+                        snprintf(buf, sizeof(buf), "%d. %s", i + 1, diff_str);
+                    }
+                }
                 lv_label_set_text(best_shares_labels[i], buf);
             } else {
-                lv_label_set_text(best_shares_labels[i], "--");
+                snprintf(buf, sizeof(buf), "%d. ---", i + 1);
+                lv_label_set_text(best_shares_labels[i], buf);
             }
         }
     }
@@ -805,6 +820,30 @@ void ui_manager_update_data(const bitaxe_data_t *data)
     if (response_label) {
         snprintf(buf, sizeof(buf), "Response: %.1f ms", data->responseTime);
         lv_label_set_text(response_label, buf);
+    }
+
+    // Update Control screen pool information
+    if (primary_pool_label) {
+        char pool_buf[160];
+        snprintf(pool_buf, sizeof(pool_buf), "Primary: %s:%lu", data->stratumURL, (unsigned long)data->stratumPort);
+        lv_label_set_text(primary_pool_label, pool_buf);
+    }
+
+    if (fallback_pool_label) {
+        char pool_buf[160];
+        snprintf(pool_buf, sizeof(pool_buf), "Fallback: %s:%lu", data->fallbackStratumURL, (unsigned long)data->fallbackStratumPort);
+        lv_label_set_text(fallback_pool_label, pool_buf);
+    }
+
+    if (current_pool_label) {
+        if (data->isUsingFallbackStratum) {
+            snprintf(buf, sizeof(buf), "Current: Fallback " LV_SYMBOL_WARNING);
+            lv_obj_set_style_text_color(current_pool_label, WARNING_COLOR, 0);
+        } else {
+            snprintf(buf, sizeof(buf), "Current: Primary");
+            lv_obj_set_style_text_color(current_pool_label, ACCENT_COLOR, 0);
+        }
+        lv_label_set_text(current_pool_label, buf);
     }
 
     // Update Charts screen
@@ -942,6 +981,11 @@ static void format_uptime(char *buf, size_t len, uint32_t seconds)
 
 static void format_time_ago(char *buf, size_t len, time_t timestamp)
 {
+    if (timestamp == 0) {
+        snprintf(buf, len, "unknown");
+        return;
+    }
+
     time_t now = time(NULL);
     int64_t diff = (int64_t)(now - timestamp);
 
@@ -952,8 +996,10 @@ static void format_time_ago(char *buf, size_t len, time_t timestamp)
     } else if (diff < 3600) {
         snprintf(buf, len, "%dm ago", (int)(diff / 60));
     } else if (diff < 86400) {
-        snprintf(buf, len, "%dh %dm ago", (int)(diff / 3600), (int)((diff % 3600) / 60));
+        snprintf(buf, len, "%dh ago", (int)(diff / 3600));
     } else {
-        snprintf(buf, len, "%dd ago", (int)(diff / 86400));
+        // For older shares, show date and time
+        struct tm *timeinfo = localtime(&timestamp);
+        strftime(buf, len, "%m/%d %H:%M", timeinfo);
     }
 }

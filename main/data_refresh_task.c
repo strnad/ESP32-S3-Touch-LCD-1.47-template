@@ -21,6 +21,7 @@ static bool task_running = false;
 
 // Tracking variables
 static uint64_t all_time_best_diff = 0;
+static uint64_t last_session_best_diff = 0;  // Track session best to detect new session shares
 static uint32_t last_block_found_state = 0;
 static uint32_t log_counter = 0;
 
@@ -63,6 +64,12 @@ static void data_refresh_task(void *pvParameters)
 
     load_all_time_best();
 
+    // Add loaded all-time best to the leaderboard (without timestamp since we don't know when it was found)
+    if (all_time_best_diff > 0) {
+        best_shares_add(all_time_best_diff, 0, true);
+        ESP_LOGI(TAG, "Added all-time best to leaderboard: %llu", (unsigned long long)all_time_best_diff);
+    }
+
     ESP_LOGI(TAG, "Data refresh task started");
 
     while (task_running) {
@@ -81,9 +88,36 @@ static void data_refresh_task(void *pvParameters)
                 save_all_time_best(all_time_best_diff);
                 ESP_LOGI(TAG, "New all-time best difficulty: %llu", (unsigned long long)all_time_best_diff);
 
-                // Add to best shares list with timestamp
+                // Add new all-time best to leaderboard with timestamp (only if time is valid)
                 time_t now = time(NULL);
-                best_shares_add(data.bestDiff, now);
+                // Check if time is reasonable (after year 2024 = timestamp > 1704067200)
+                time_t timestamp = (now > 1704067200) ? now : 0;
+                best_shares_add(all_time_best_diff, timestamp, true);
+                ESP_LOGI(TAG, "Added new all-time best with timestamp: %lld", (long long)timestamp);
+            }
+
+            // Track session best shares - capture every change in bestSessionDiff
+            // This includes both increases within a session AND new sessions starting
+            if (data.bestSessionDiff != last_session_best_diff && data.bestSessionDiff > 0) {
+                // Detect session restart (value decreased significantly)
+                if (data.bestSessionDiff < last_session_best_diff && last_session_best_diff > 0) {
+                    ESP_LOGI(TAG, "Session restart detected (diff changed from %llu to %llu)",
+                             (unsigned long long)last_session_best_diff, (unsigned long long)data.bestSessionDiff);
+                }
+
+                // Update tracker and add to top 10 list
+                // best_shares_add() will only add it if it qualifies for top 10
+                last_session_best_diff = data.bestSessionDiff;
+                time_t now = time(NULL);
+                // Check if time is reasonable (after year 2024 = timestamp > 1704067200)
+                time_t timestamp = (now > 1704067200) ? now : 0;
+
+                // Check if this session best is also the all-time best
+                bool is_all_time = (data.bestSessionDiff >= all_time_best_diff);
+                best_shares_add(data.bestSessionDiff, timestamp, is_all_time);
+
+                ESP_LOGI(TAG, "Session best share: %llu (is_all_time: %d, timestamp: %lld)",
+                         (unsigned long long)data.bestSessionDiff, is_all_time, (long long)timestamp);
             }
 
             // Check for block found event

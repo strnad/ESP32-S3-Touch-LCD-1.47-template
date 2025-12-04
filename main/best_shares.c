@@ -57,30 +57,70 @@ static esp_err_t save_to_nvs(void)
 esp_err_t best_shares_init(void)
 {
     if (initialized) {
+        ESP_LOGI(TAG, "Best shares already initialized");
         return ESP_OK;
     }
 
     // Initialize array
     memset(best_shares, 0, sizeof(best_shares));
 
-    // Load from NVS
+    // Load from NVS (will return ESP_OK even if no data found)
     esp_err_t ret = load_from_nvs();
 
+    // Always mark as initialized, even if NVS load fails
+    // We can still collect new shares even if we couldn't load old ones
+    initialized = true;
+
     if (ret == ESP_OK) {
-        initialized = true;
-        ESP_LOGI(TAG, "Best shares tracker initialized");
+        ESP_LOGI(TAG, "Best shares tracker initialized successfully");
     } else {
-        ESP_LOGE(TAG, "Failed to initialize best shares tracker");
+        ESP_LOGW(TAG, "Best shares initialized but NVS load failed, starting with empty list");
     }
 
-    return ret;
+    return ESP_OK;  // Always return OK since we can still operate
 }
 
-void best_shares_add(uint64_t diff, time_t timestamp)
+void best_shares_add(uint64_t diff, time_t timestamp, bool is_all_time_best)
 {
     if (!initialized) {
         ESP_LOGW(TAG, "Best shares not initialized");
         return;
+    }
+
+    ESP_LOGI(TAG, "Attempting to add share: %llu (all-time: %d)", (unsigned long long)diff, is_all_time_best);
+
+    // Special handling for all-time best updates
+    if (is_all_time_best) {
+        // Find and remove old all-time best entry if it exists
+        for (int i = 0; i < MAX_BEST_SHARES; i++) {
+            if (best_shares[i].valid && best_shares[i].is_all_time_best) {
+                // If the new all-time best has same difficulty as old, just update timestamp
+                if (best_shares[i].difficulty == diff) {
+                    if (timestamp > 0) {
+                        best_shares[i].timestamp = timestamp;
+                        ESP_LOGI(TAG, "Updated all-time best timestamp");
+                        save_to_nvs();
+                    }
+                    return;
+                }
+
+                // Remove old all-time best (it will be re-added if still in top 10)
+                ESP_LOGI(TAG, "Removing old all-time best at position %d", i + 1);
+                for (int j = i; j < MAX_BEST_SHARES - 1; j++) {
+                    best_shares[j] = best_shares[j + 1];
+                }
+                best_shares[MAX_BEST_SHARES - 1].valid = false;
+                break;
+            }
+        }
+    } else {
+        // For session shares, check if this exact difficulty already exists
+        for (int i = 0; i < MAX_BEST_SHARES; i++) {
+            if (best_shares[i].valid && best_shares[i].difficulty == diff && !best_shares[i].is_all_time_best) {
+                ESP_LOGI(TAG, "Share %llu already exists at position %d, skipping", (unsigned long long)diff, i + 1);
+                return;
+            }
+        }
     }
 
     // Find position to insert (sorted by difficulty, highest first)
@@ -95,6 +135,7 @@ void best_shares_add(uint64_t diff, time_t timestamp)
 
     // If not in top 10, ignore
     if (insert_pos == -1) {
+        ESP_LOGI(TAG, "Share %llu not in top 10, ignoring", (unsigned long long)diff);
         return;
     }
 
@@ -107,8 +148,10 @@ void best_shares_add(uint64_t diff, time_t timestamp)
     best_shares[insert_pos].difficulty = diff;
     best_shares[insert_pos].timestamp = timestamp;
     best_shares[insert_pos].valid = true;
+    best_shares[insert_pos].is_all_time_best = is_all_time_best;
 
-    ESP_LOGI(TAG, "New share added at position %d: %llu", insert_pos + 1, (unsigned long long)diff);
+    ESP_LOGI(TAG, "New share added at position %d: %llu (all-time: %d)",
+             insert_pos + 1, (unsigned long long)diff, is_all_time_best);
 
     // Save to NVS
     save_to_nvs();
