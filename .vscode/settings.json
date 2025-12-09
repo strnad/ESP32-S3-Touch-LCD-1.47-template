@@ -17,5 +17,6 @@
   "idf.espIdfPath": "/home/jakub/esp/v5.4/esp-idf",
   "idf.toolsPath": "/home/jakub/.espressif",
   "idf.pythonInstallPath": "/usr/bin/python",
-  "idf.port": "/dev/ttyACM0"
+  "idf.port": "/dev/ttyACM0",
+  "idf.monitorPort": "/dev/ttyACM0"
 }

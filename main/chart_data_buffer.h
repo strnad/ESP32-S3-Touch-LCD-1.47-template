@@ -43,6 +43,12 @@ const chart_data_point_t* chart_buffer_get_data(uint16_t *count);
  */
 uint16_t chart_buffer_get_count(void);
 
+/**
+ * @brief Load historical data from SD card into buffer
+ * @return ESP_OK on success, ESP_FAIL on error
+ */
+esp_err_t chart_buffer_load_from_sd(void);
+
 #ifdef __cplusplus
 }
 #endif

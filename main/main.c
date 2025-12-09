@@ -125,10 +125,10 @@ void app_main(void)
     {
         ESP_LOGI(TAG, "Initializing UI...");
         ui_manager_init();
-        
+
         // Initialize gesture handler for swipe navigation
         gesture_handler_init(lvgl_touch_indev);
-        
+
         lvgl_port_unlock();
     }
     
@@ -149,6 +149,18 @@ void app_main(void)
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Chart buffer initialization failed");
     }
+    // Temporarily disabled to debug LVGL crash
+    /*
+    else {
+        // Load historical data from SD card into chart buffer
+        ESP_LOGI(TAG, "Loading historical chart data from SD card...");
+        ret = chart_buffer_load_from_sd();
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to load chart data from SD card");
+        }
+        // Note: Chart UI will be populated on first data refresh
+    }
+    */
 
     // Start data refresh task
     ESP_LOGI(TAG, "Starting data refresh task...");

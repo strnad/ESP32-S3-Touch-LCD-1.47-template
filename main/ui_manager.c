@@ -74,6 +74,7 @@ static lv_obj_t *temp_chart = NULL;
 static lv_chart_series_t *hashrate_series = NULL;
 static lv_chart_series_t *temp_series = NULL;
 static lv_chart_series_t *vrtemp_series = NULL;
+static bool chart_history_loaded = false;
 
 // Forward declarations
 static void create_page_indicator(void);
@@ -868,6 +869,12 @@ void ui_manager_goto_screen(screen_index_t screen, bool animate, bool direction_
 
     current_screen = screen;
 
+    // Load historical chart data when switching to charts screen for the first time
+    if (screen == SCREEN_CHARTS && !chart_history_loaded) {
+        ui_manager_load_chart_history();
+        chart_history_loaded = true;
+    }
+
     // Show page indicator
     if (page_indicator) {
         lv_obj_clear_flag(page_indicator, LV_OBJ_FLAG_HIDDEN);
@@ -1002,4 +1009,37 @@ static void format_time_ago(char *buf, size_t len, time_t timestamp)
         struct tm *timeinfo = localtime(&timestamp);
         strftime(buf, len, "%m/%d %H:%M", timeinfo);
     }
+}
+
+void ui_manager_load_chart_history(void)
+{
+    if (!hashrate_series || !temp_series || !vrtemp_series) {
+        ESP_LOGW(TAG, "Chart series not initialized");
+        return;
+    }
+
+    // Get historical data from buffer
+    uint16_t count = 0;
+    const chart_data_point_t* data = chart_buffer_get_data(&count);
+
+    if (count == 0 || !data) {
+        ESP_LOGI(TAG, "No historical data to load into charts");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Loading %d historical data points into charts", count);
+
+    // Load all historical data points into the charts using set_next_value
+    // This is safer than changing point count dynamically
+    for (uint16_t i = 0; i < count; i++) {
+        lv_chart_set_next_value(hashrate_chart, hashrate_series, (int32_t)data[i].hashrate);
+        lv_chart_set_next_value(temp_chart, temp_series, (int32_t)data[i].temp);
+        lv_chart_set_next_value(temp_chart, vrtemp_series, (int32_t)data[i].vrTemp);
+    }
+
+    // Refresh the charts to update display
+    lv_chart_refresh(hashrate_chart);
+    lv_chart_refresh(temp_chart);
+
+    ESP_LOGI(TAG, "Historical chart data loaded successfully");
 }

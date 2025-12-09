@@ -33,6 +33,12 @@ esp_err_t ui_manager_init(void);
 void ui_manager_update_data(const bitaxe_data_t *data);
 
 /**
+ * @brief Load historical chart data from buffer
+ * @note This function must be called with LVGL lock acquired
+ */
+void ui_manager_load_chart_history(void);
+
+/**
  * @brief Navigate to specific screen
  * @param screen Screen index
  * @param animate Whether to animate the transition
