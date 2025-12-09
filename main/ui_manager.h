@@ -64,6 +64,16 @@ void ui_manager_show_block_found(uint32_t block_height, uint64_t best_diff);
  */
 void ui_manager_hide_block_found(void);
 
+/**
+ * @brief Show connectivity loss warning (blinking red indicator)
+ */
+void ui_manager_show_connectivity_warning(void);
+
+/**
+ * @brief Hide connectivity loss warning
+ */
+void ui_manager_hide_connectivity_warning(void);
+
 // Status bar removed - status info now integrated into dashboard screen
 
 #ifdef __cplusplus

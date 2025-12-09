@@ -25,6 +25,11 @@ static uint64_t last_session_best_diff = 0;  // Track session best to detect new
 static uint32_t last_block_found_state = 0;
 static uint32_t log_counter = 0;
 
+// Connectivity tracking
+static TickType_t last_successful_fetch = 0;
+static bool connectivity_warning_shown = false;
+#define CONNECTIVITY_TIMEOUT_MS 5000  // 5 seconds
+
 // Load all-time best diff from NVS
 static void load_all_time_best(void)
 {
@@ -78,6 +83,17 @@ static void data_refresh_task(void *pvParameters)
 
         if (ret == ESP_OK && data.valid) {
             error_count = 0; // Reset error counter on success
+            last_successful_fetch = xTaskGetTickCount(); // Update last successful fetch time
+
+            // Hide connectivity warning if it was shown
+            if (connectivity_warning_shown) {
+                if (lvgl_port_lock(pdMS_TO_TICKS(100))) {
+                    ui_manager_hide_connectivity_warning();
+                    lvgl_port_unlock();
+                }
+                connectivity_warning_shown = false;
+                ESP_LOGI(TAG, "Connectivity restored");
+            }
 
             // Add data point to chart buffer
             chart_buffer_add_point(&data);
@@ -155,6 +171,22 @@ static void data_refresh_task(void *pvParameters)
         } else {
             error_count++;
             ESP_LOGW(TAG, "Failed to fetch data from Bitaxe (error %" PRIu32 ")", error_count);
+
+            // Check if connectivity has been lost for more than 5 seconds
+            if (last_successful_fetch > 0) {
+                TickType_t time_since_last_success = xTaskGetTickCount() - last_successful_fetch;
+                uint32_t ms_since_last_success = pdTICKS_TO_MS(time_since_last_success);
+
+                if (ms_since_last_success > CONNECTIVITY_TIMEOUT_MS && !connectivity_warning_shown) {
+                    // Show connectivity warning
+                    if (lvgl_port_lock(pdMS_TO_TICKS(100))) {
+                        ui_manager_show_connectivity_warning();
+                        lvgl_port_unlock();
+                    }
+                    connectivity_warning_shown = true;
+                    ESP_LOGW(TAG, "Miner connectivity lost for more than 5 seconds");
+                }
+            }
 
             // Wait only 3 seconds on error to retry faster
             vTaskDelay(pdMS_TO_TICKS(3000));

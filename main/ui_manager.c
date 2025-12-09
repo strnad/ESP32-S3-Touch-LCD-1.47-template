@@ -22,6 +22,10 @@ static screen_index_t current_screen = SCREEN_DASHBOARD;
 static lv_obj_t *block_overlay = NULL;
 static lv_obj_t *block_label = NULL;
 
+// Connectivity warning
+static lv_obj_t *connectivity_warning = NULL;
+static lv_timer_t *connectivity_blink_timer = NULL;
+
 // Page indicator
 static lv_obj_t *page_indicator = NULL;
 static lv_obj_t *page_dots[SCREEN_COUNT] = {NULL};
@@ -88,6 +92,7 @@ static void format_difficulty(char *buf, size_t len, uint64_t diff);
 static void format_uptime(char *buf, size_t len, uint32_t seconds);
 static void format_time_ago(char *buf, size_t len, time_t timestamp);
 static void page_indicator_timer_callback(lv_timer_t *timer);
+static void connectivity_blink_timer_callback(lv_timer_t *timer);
 
 // Button callback
 static void restart_btn_callback(lv_event_t *e);
@@ -946,6 +951,61 @@ void ui_manager_hide_block_found(void)
         lv_obj_del(block_overlay);
         block_overlay = NULL;
         block_label = NULL;
+    }
+}
+
+static void connectivity_blink_timer_callback(lv_timer_t *timer)
+{
+    if (connectivity_warning) {
+        // Toggle visibility for blinking effect
+        if (lv_obj_has_flag(connectivity_warning, LV_OBJ_FLAG_HIDDEN)) {
+            lv_obj_clear_flag(connectivity_warning, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(connectivity_warning, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+void ui_manager_show_connectivity_warning(void)
+{
+    if (connectivity_warning) {
+        return; // Already showing
+    }
+
+    // Create warning indicator on top layer (center of screen)
+    connectivity_warning = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(connectivity_warning, 180, 70);
+    lv_obj_align(connectivity_warning, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(connectivity_warning, ERROR_COLOR, 0);
+    lv_obj_set_style_border_width(connectivity_warning, 2, 0);
+    lv_obj_set_style_border_color(connectivity_warning, TEXT_COLOR, 0);
+    lv_obj_set_style_radius(connectivity_warning, 10, 0);
+
+    lv_obj_t *warning_label = lv_label_create(connectivity_warning);
+    lv_label_set_text(warning_label, LV_SYMBOL_WARNING " NO MINER");
+    lv_obj_center(warning_label);
+    lv_obj_set_style_text_align(warning_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(warning_label, TEXT_COLOR, 0);
+    lv_obj_set_style_text_font(warning_label, &lv_font_montserrat_20, 0);
+
+    // Create blinking timer (500ms interval)
+    if (!connectivity_blink_timer) {
+        connectivity_blink_timer = lv_timer_create(connectivity_blink_timer_callback, 500, NULL);
+    }
+
+    ESP_LOGI(TAG, "Connectivity warning displayed");
+}
+
+void ui_manager_hide_connectivity_warning(void)
+{
+    if (connectivity_warning) {
+        lv_obj_del(connectivity_warning);
+        connectivity_warning = NULL;
+    }
+
+    if (connectivity_blink_timer) {
+        lv_timer_del(connectivity_blink_timer);
+        connectivity_blink_timer = NULL;
     }
 }
 
